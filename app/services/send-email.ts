@@ -1,5 +1,5 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 
-import auth from 'firebase/auth';
 import nodemailer from 'nodemailer';
 
 interface EmailOptions {
@@ -43,7 +43,7 @@ export class EmailService {
     try {
       await this.transporter.sendMail({
 
-        //@ts-ignore
+        //@ts-expect-error
         from: this.transporter.options.auth.user,
         to,
         subject,
