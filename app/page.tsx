@@ -1,101 +1,166 @@
-import Image from "next/image";
+'use client';
 
+import { useState, useRef, useEffect } from 'react';
+import { IoSend } from 'react-icons/io5';
+import { send } from '@emailjs/browser';
+import moment from 'moment';
+import { db } from '../firebase/config';
+import { addDoc } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [message, setMessage] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [chat, setChat] = useState<{
+    is_agent: boolean;
+    message: string;
+    isDone?: boolean;
+  }[]>([]);
+
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chat]);
+
+  const today = moment().format('ddd, DD MMM, YYYY');
+
+  const EMAIL_SERVICE = 'service_jh6z4lu';
+  const EMAIL_TEMPLATE = 'template_k8mm0mx';
+  const PUBLIC_KEY = '3ijg6Sqj-JSXxForh';
+
+  const updateFirebaseWorkUpdate = async (workUpdate: string) => {
+    const docRef = await addDoc(collection(db, 'workUpdates'), {
+      workUpdate: workUpdate,
+      date: today,
+      subject: 'Work Update',
+      sendTo: ['sky32752@gmail.com', 'sarahaadeez21@gmail.com'],
+    });
+    console.log('Document written with ID: ', docRef.id);
+  }
+
+  const sendEmail = async (body: string) => {
+    try {
+      const response = await send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
+        message: body,
+        date: today,
+        subject: 'Work Update',
+        sendTo: ['sky32752@gmail.com', 'sarahaadeez21@gmail.com'],
+      }, {
+        publicKey : PUBLIC_KEY,
+      });
+      console.log({ response });
+      await updateFirebaseWorkUpdate(body);
+      setChat(prev => [...prev.slice(0, -1), { is_agent: true, message: 'Email sent successfully' , id: Date.now() , isDone: true }]);
+    } catch (error) {
+      console.error('Error sending email:', error);
+    }
+  };
+
+  const handleWorkUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim().length < 1) return;
+    const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    setChat(prev => [...prev, { is_agent: false, message: message.trim() , id: randomId }]);
+ 
+   const lastMessageEmpty = chat.length > 0 && chat[chat.length - 1].message.length === 0;
+   if(lastMessageEmpty){
+    setChat(prev => [...prev.slice(0, -1), { is_agent: true, message: '' , id: randomId }]);
+   }
+    setMessage('')
+    const response = await fetch('/api/worker', {
+      method: 'POST',
+      body: JSON.stringify({ workUpdate: message.trim() }),
+    });
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullMessage = '';
+    
+    while (true) {
+      const { done, value } = await reader!.read();
+      if (done) {
+        setChat(prevChat => [
+          ...prevChat.slice(0, -1),
+          { is_agent: true, message: fullMessage, id: randomId , isDone: true}
+        ]);
+        break;
+      };
+      
+      const text = decoder.decode(value);
+      fullMessage += text;
+      if(fullMessage.trim().length > 0){
+      setChat(prevChat => [
+        ...prevChat.slice(0, -1),
+        { is_agent: true, message: fullMessage, id: randomId , isDone: false}
+      ]);}
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen items-center justify-center px-1">
+      <div className="flex flex-col w-[80%] h-[80%] bg-gray-900 rounded-lg shadow-lg shadow-black p-6">
+        <h1 className="text-3xl font-bold text-gray-100 font-mono mb-6">
+          Welcome to work update agent for EHSsoftware.io
+        </h1>
+
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto mb-4 space-y-4">
+          {chat.map((item, index) => (
+            <div
+              key={index}
+              className={`flex ${item.is_agent ? 'justify-start' : 'justify-end'}`}
+            >
+              <div
+                className={`max-w-[70%] rounded-lg p-4 ${
+                  item.is_agent
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-blue-500 text-white ml-auto'
+                }`}
+              >
+                <p className="break-words">{item.message}</p>
+                {item.is_agent && item?.isDone && item.message.length > 0 && !item.message.includes("Does not look like a work update.") && (
+                  <div className="flex gap-2 mt-5">
+                    <button
+                      onClick={() => sendEmail(item.message)}
+                      className="bg-green-500 font-mono  hover:bg-green-600 text-white text-sm px-3 py-1 rounded-full transition-colors"
+                    >
+                      Send Email
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(item.message);
+                        alert("Copied to clipboard")
+                      }}
+                      className="bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 font-mono py-1 rounded-full transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+
+        <form
+          onSubmit={handleWorkUpdate}
+          className="flex gap-2"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+          <input
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="text-black font-mono w-full rounded-full px-6 py-3 border border-gray-300 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <button
+            type="submit"
+            className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-3 transition-colors"
+          >
+            <IoSend size={20} />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
