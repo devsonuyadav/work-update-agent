@@ -46,7 +46,7 @@ export default function Home() {
         message: body,
         date: today,
         subject: 'Work Update',
-        sendTo: ['sky32752@gmail.com', 'sarahaadeez21@gmail.com'],
+        sendTo:['sonu@ehssoftware.io', 'sameer@ehssoftware.io', 'kenny@ehssoftware.io', 'pradip@ehssoftware.io', 'leela@ehssoftware.io', 'dk@ehssoftware.io']
       }, {
         publicKey : PUBLIC_KEY,
       });
